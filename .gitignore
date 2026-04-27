@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local env
+.env
+.env.local
+*.log
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/sessions/
+*.tmp
+*.tmp.*
+
+# MemPalace local data (kullanıcının kendi memory'si, repo içine girmez)
+.mempalace/
+mempalace-data/
+
+# Vault-specific (varsa)
+.obsidian/
+*.md.tmp
