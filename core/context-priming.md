@@ -119,7 +119,7 @@ Post-cutoff information, canonical documentation, current state.
 
 ## Knowledge Cutoff Discipline
 
-Cutoff: **January 2026.** Today: **2026-04-26.**
+Cutoff: model-dependent; treat anything from the last few months as suspect. Today: read it from the environment context at session start. Never hardcode either value into reasoning.
 
 Anything after the cutoff requires verification:
 
@@ -137,7 +137,7 @@ Anything after the cutoff requires verification:
 
 ## Context Budget
 
-Opus 4.7 = **1M context window**. Wide, not infinite.
+Opus 4.8 = **1M context window**. Wide, not infinite.
 
 | Budget slice | Max share | Example |
 |---|---|---|
@@ -152,7 +152,7 @@ Opus 4.7 = **1M context window**. Wide, not infinite.
 2. **Strategic compact.** Use the `strategic-compact` skill as a manual checkpoint.
 3. **Filtered priming.** Do not read whole files. Grep for the relevant section.
 
-**On Sonnet/Haiku 4.x** the window is 200K, ceiling 20% (~40K). Priming has to be much tighter.
+**On Haiku 4.5** the window is 200K, ceiling 20% (~40K); priming has to be much tighter. Sonnet 5 matches Opus at 1M.
 
 ---
 

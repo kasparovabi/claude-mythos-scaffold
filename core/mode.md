@@ -24,6 +24,8 @@ related:
 
 On April 8, 2026, Anthropic opened `Claude Mythos Preview` as a gated research preview. Codename **Capybara**. No public access, distributed under Project Glasswing only to critical partner organizations.
 
+**Update (July 2026):** the Mythos line shipped publicly as **Claude Fable 5** (`claude-fable-5`, $10/$50 per MTok, twice Opus 4.8's price), with `claude-mythos-5` continuing under Project Glasswing. Fable's own working patterns were distilled into [fable-distilled](./fable-distilled.md) on 2026-07-06. The daily executor this scaffold targets is now **Opus 4.8**. If the session model is already Fable/Mythos-class, do not load this scaffold (see SKILL.md model gating).
+
 **Characteristics:**
 - SWE-bench 93.9%, USAMO 97.6%, a generational leap
 - Strong autonomous reasoning over long horizons
@@ -68,6 +70,7 @@ Threshold test: "Can I finish this in one context window, with one tool call, wi
 
 | Skill | Front | Trigger |
 |---|---|---|
+| [fable-distilled](./fable-distilled.md) | All fronts, condensed | Always first; alone covers most sessions |
 | [tool-stack](./tool-stack.md) | Action capacity | "Which tool do I start with on a fresh problem?" |
 | [context-priming](./context-priming.md) | Domain context | New domain, "understand this project" query |
 | [decomposition](./decomposition.md) | Action capacity | Task that cannot be solved one-shot |
@@ -113,9 +116,9 @@ Verify after every major step. To say "done" the build or test passed, the outpu
 Detail: [verification](./verification.md)
 
 ### 3. Context budget discipline
-Opus 4.7 ships with a 1M context window. **Cap priming at 10 to 15 percent** (around 100 to 150K). Verbose output (test logs, file dumps, repo scans) goes to a sub-agent; only the summary returns to main context. The window is large but "fills up fast, performance degrades as it fills." Plenty is not the same as free.
+Opus 4.8 and Sonnet 5 ship with a 1M context window. **Cap priming at 10 to 15 percent** (around 100 to 150K). Verbose output (test logs, file dumps, repo scans) goes to a sub-agent; only the summary returns to main context. The window is large but "fills up fast, performance degrades as it fills." Plenty is not the same as free.
 
-For Sonnet 4.6 or Haiku 4.5 (200K context), the threshold is 20 percent (around 40K).
+For Haiku 4.5 (200K context), the threshold is 20 percent (around 40K).
 
 Detail: [decomposition](./decomposition.md) (sub-agent rules), [context-priming](./context-priming.md) (budget)
 
@@ -195,4 +198,4 @@ This framework is *not* Mythos. It is an **approach** to Mythos. Be honest where
 
 ---
 
-*Last update: 2026-04-27. In sync with the global skills directory.*
+*Last update: 2026-07-06 (Fable-distilled sync). In sync with the global skills directory.*

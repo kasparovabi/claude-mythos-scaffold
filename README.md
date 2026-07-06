@@ -7,9 +7,9 @@ A Claude Code skill set that brings agentic discipline (Plan-and-Execute, Reflex
 
 ## Why This Exists
 
-Claude Mythos Preview demonstrated agentic behaviors (problem persistence, multi-step iteration, verification-driven correction) that scaffold patterns can partially reproduce in vanilla Claude (Sonnet 4.6, Opus 4.7). This repo packages those patterns as opt-in skills.
+Claude Mythos Preview demonstrated agentic behaviors (problem persistence, multi-step iteration, verification-driven correction) that scaffold patterns can partially reproduce in Opus-class and smaller models (Opus 4.8, Sonnet 5, Haiku 4.5). This repo packages those patterns as opt-in skills. Since July 2026 the scaffold also carries `core/fable-distilled.md`: working patterns written by Claude Fable 5 (the GA'd Mythos-class model) about its own decomposition, verification, and next-action habits, captured during the 2-7 July free window.
 
-**Honest expectation:** scaffolding closes 40 to 60 percent of the gap. Raw reasoning depth, novel pattern recognition, and sample efficiency cannot be patched in via prompts; those are weights.
+**Honest expectation:** the scaffold transfers process discipline, not capability. It makes Opus 4.8 a disciplined Opus 4.8, not a Fable. Raw reasoning depth, novel pattern recognition, and sample efficiency cannot be patched in via prompts; those are weights. Do not fully load it on Fable 5 / Mythos 5: over-scaffolding degrades Mythos-class output.
 
 **What you get:** systematic protocols for tool selection, context priming, problem decomposition, verification loops, and failure recovery. Plus two domain modes: long-horizon research synthesis and codebase migration.
 
@@ -17,7 +17,9 @@ Claude Mythos Preview demonstrated agentic behaviors (problem persistence, multi
 
 ```
 claude-mythos-scaffold/
+├── SKILL.md                       Skill entry: model gating + tiered activation
 ├── core/                          Foundation skills (vault-agnostic)
+│   ├── fable-distilled.md         Fable 5 working patterns (read first)
 │   ├── mode.md                    Entry point, mode rules
 │   ├── tool-stack.md              Cascade selection, parallel/sequential
 │   ├── context-priming.md         Adaptive RAG, source hierarchy
@@ -56,16 +58,16 @@ Copy core skills to your global Claude Code skills directory.
 macOS or Linux:
 
 ```bash
-mkdir -p ~/.claude/skills/mythos
-cp core/* ~/.claude/skills/mythos/
+cp -R . ~/.claude/skills/mythos-scaffold
 cp commands/mythos-mode.md ~/.claude/commands/
 ```
+
+Copy the whole directory (not just `core/*`): `SKILL.md` resolves skills via relative `./core/` links and drives the tiered activation.
 
 Windows:
 
 ```powershell
-mkdir -p $env:USERPROFILE\.claude\skills\mythos
-Copy-Item core\* $env:USERPROFILE\.claude\skills\mythos\
+Copy-Item -Recurse . $env:USERPROFILE\.claude\skills\mythos-scaffold
 Copy-Item commands\mythos-mode.md $env:USERPROFILE\.claude\commands\
 ```
 
@@ -91,6 +93,7 @@ If you maintain a knowledge vault, the skills support `[[wikilink]]` cross-refer
 
 **Newer (1 internal review pass):**
 
+* `core/fable-distilled.md` (distilled from Claude Fable 5 itself, 2026-07-06)
 * `core/memory.md` (MemPalace integration)
 * `domains/research/*` (5 skills)
 * `domains/migration/*` (5 skills)

@@ -162,6 +162,17 @@ If verify failed:
 
 ---
 
+## Evidence-Grounded Reporting
+
+Distilled from Fable 5 ([fable-distilled](./fable-distilled.md) section 2). Four habits that kill the fake "done":
+
+- **Audit every progress claim against a tool result from this session.** Work you cannot point evidence at gets reported as unverified, in those words.
+- **Re-read the original request before the final report.** Multi-part asks lose their second half in long sessions. Answer every part or name what is left open.
+- **Scan your own diff once before reporting.** Imports, callers, and docs adjacent to what you touched break silently.
+- **Verify at the altitude the user consumes.** UI change: look at the UI. API change: call it. Skill or prompt change: dry-run the trigger. A passing unit test under a broken page is not done.
+
+---
+
 ## Definition of "Done"
 
 To mark `completed` in TodoWrite:

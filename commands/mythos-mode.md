@@ -8,10 +8,10 @@ description: Activate Mythos scaffold with skill set primed for a complex task.
 
 Before running the steps, resolve where the skill set lives:
 
-- Skills live in the global Claude Code skills directory under `mythos/`. On Unix-like systems this is `~/.claude/skills/mythos/`. On other platforms use the equivalent location.
-- Each skill file is named `mythos-<skill>.md` (mode, context-priming, decomposition, tool-stack, agent-loop, verification, failure-recovery).
+- Skills live in the global Claude Code skills directory. On Unix-like systems this is `~/.claude/skills/mythos-scaffold/core/`. On other platforms use the equivalent location.
+- Each skill file is named `<skill>.md` (fable-distilled, mode, context-priming, decomposition, tool-stack, agent-loop, verification, failure-recovery).
 
-In this document the notation `<MYTHOS>/<skill>.md` points at the resolved file inside that directory. `<MYTHOS>` always refers to the global skills directory containing this scaffold.
+In this document the notation `<MYTHOS>/<skill>.md` points at the resolved file inside that directory. `<MYTHOS>` always refers to `~/.claude/skills/mythos-scaffold/core`.
 
 ## Input
 $ARGUMENTS
@@ -26,13 +26,13 @@ Mythos mode means seeing the capability ceiling and using a scaffold to close wh
 **Closable:** knowledge gap (RAG/web), action capacity (tool/MCP), persistence (loop), domain context (priming).
 **Not closable:** raw reasoning depth, novel pattern recognition, sample efficiency.
 
-Honest expectation: 40 to 60 percent of Mythos quality on narrow tasks. Far less on areas like CVE discovery or exploit dev.
+Honest expectation: the scaffold transfers process discipline, not capability. It makes the executor a disciplined version of itself, not a Fable. Far less benefit on areas needing novel pattern discovery, like CVE hunting or exploit dev.
 
 ## Steps
 
-1. **Load mode and rules.**
-   Read `<MYTHOS>/mode.md`.
-   The seven behavior rules in that file (persistence, verify, context budget, cutoff, plan-execute, parallel, destructive-stop) are the law for this run.
+1. **Load distilled patterns and rules.**
+   Read `<MYTHOS>/fable-distilled.md` (Fable 5 working patterns, 2026-07-06), then `<MYTHOS>/mode.md`.
+   The seven behavior rules (persistence, verify, context budget, cutoff, plan-execute, parallel, destructive-stop) plus the distilled decomposition, verification, and next-action patterns are the law for this run.
 
 2. **Threshold test.**
    Does this task actually deserve Mythos mode?
@@ -51,6 +51,7 @@ Honest expectation: 40 to 60 percent of Mythos quality on narrow tasks. Far less
    - Three-question decomposition test (single context, independence, verbosity).
    - Write a plan into TodoWrite.
    - Decide on sub-agents (Explore, Plan, Architect, Code-reviewer, Security, Build-error).
+   - Name the model on every sub-agent call: haiku for mechanical bulk, sonnet for light code, opus for heavy code and review.
    - Independent parts go to parallel sub-agents.
 
 5. **Tool stack.**
@@ -104,6 +105,7 @@ Honest expectation: 40 to 60 percent of Mythos quality on narrow tasks. Far less
 
 ## Rules
 
+- **Model gating.** If the session model is already Mythos-class (Fable 5 / Mythos 5), skip steps 3 to 8: state the goal and constraints, keep only the verify rule, and let the model work. Over-scaffolding degrades Mythos-class output.
 - **Skip the mode when it is not warranted.** Mythos overhead on trivial work is pure loss.
 - **Stay faithful to the skill set.** Steps 3 to 8 are detailed in the linked files. Do not bypass them with "my own way."
 - **No completion without verify.** A TodoWrite item is not done until verify passes.

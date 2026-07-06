@@ -100,6 +100,23 @@ Available agent types (global agents directory plus harness built ins):
 
 ---
 
+## Model Routing (cost-aware fan-out)
+
+Name the model explicitly on every sub-agent call. A fan-out left on the default model is the most expensive silent mistake in delegation.
+
+| Sub-task shape | Model |
+|---|---|
+| Mechanical / bulk (rename sweep, log triage, format pass, checklist run) | `haiku` |
+| Light code, scoped search-and-summarize | `sonnet` |
+| Heavy code, architectural review, subtle-bug hunting | `opus` (4.8) |
+
+Two Opus 4.8 quirks worth engineering around (documented in Anthropic's migration guide):
+
+- **4.8 under-reaches for sub-agents by default.** Put the spawn trigger in writing: "when work fans out across independent items (many files, many tests, many candidates), delegate in parallel; for single-file reads and sequential edits, work directly."
+- **Prescriptive when-to-use lines give measurable lift.** State the trigger condition inside the briefing and the agent description, not just the capability.
+
+---
+
 ## Hub and Spoke Pattern
 
 ```
