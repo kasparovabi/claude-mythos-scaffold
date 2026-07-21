@@ -37,3 +37,10 @@ mempalace-data/
 # Vault-specific (varsa)
 .obsidian/
 *.md.tmp
+
+# Private runtime state (belt-and-suspenders; real homes live outside the repo)
+missions/
+local/
+*.mission.md
+.mythos-mission.md
+eval/tasks/*/repo/__pycache__/

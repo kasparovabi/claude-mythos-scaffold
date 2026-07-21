@@ -1,0 +1,294 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+EVAL_DIR="$SCRIPT_DIR"
+TASKS_DIR="$EVAL_DIR/tasks"
+METRICS="$REPO_DIR/eval/tools/metrics.py"
+HEADLESS_FILE="$REPO_DIR/core/headless.md"
+
+DATA_HOME="$HOME/.claude/mythos/eval-data"
+RUNS_DIR="$DATA_HOME/runs"
+SCORES_TSV="$DATA_HOME/scores.tsv"
+SHARE_FILE="$HOME/.cache/wasteland/fable-share"
+
+DEFAULT_MODEL="claude-opus-4-8"
+MAX_TURNS="${MYTHOS_EVAL_MAX_TURNS:-40}"
+MAX_BUDGET="${MYTHOS_EVAL_MAX_BUDGET:-2}"
+ESTIMATE_NOTE="expect roughly 150-500K tokens per run"
+
+MODEL="$DEFAULT_MODEL"
+FORCE=0
+KEEP=0
+TASK_FILTER=""
+ARM_FILTER=""
+
+log() { printf '%s\n' "$*"; }
+err() { printf '%s\n' "$*" >&2; }
+
+discover_tasks() {
+  local d name
+  for d in "$TASKS_DIR"/*/; do
+    [ -d "$d" ] || continue
+    name="$(basename "$d")"
+    [ -f "$d/prompt.txt" ] && [ -f "$d/check.sh" ] || continue
+    printf '%s\n' "$name"
+  done
+}
+
+task_matches() {
+  local name="$1" filter="$2" short="${1%%-*}" item
+  [ -z "$filter" ] && return 0
+  local IFS=,
+  for item in $filter; do
+    [ "$item" = "$name" ] && return 0
+    [ "$item" = "$short" ] && return 0
+  done
+  return 1
+}
+
+arm_matches() {
+  local arm="$1" filter="$2" item
+  [ -z "$filter" ] && return 0
+  local IFS=,
+  for item in $filter; do
+    [ "$item" = "$arm" ] && return 0
+  done
+  return 1
+}
+
+budget_gate() {
+  if [ ! -f "$SHARE_FILE" ]; then
+    log "budget: share file missing ($SHARE_FILE); proceeding"
+    return 0
+  fi
+  local F_EPOCH F_PCT F_FAB F_WEEK F_BUDGET _rest
+  read -r F_EPOCH F_PCT F_FAB F_WEEK F_BUDGET _rest < "$SHARE_FILE" || true
+  if [ -z "${F_BUDGET:-}" ]; then
+    log "budget: share file unreadable; proceeding"
+    return 0
+  fi
+  if awk -v b="$F_BUDGET" 'BEGIN{exit !(b==0)}'; then
+    log "budget: informational only, PCT=${F_PCT}"
+    return 0
+  fi
+  local haf f5
+  haf="$(awk -v w="$F_WEEK" -v b="$F_BUDGET" 'BEGIN{printf "%.1f", 100*w/b}')"
+  f5="$(awk -v f="$F_FAB" -v b="$F_BUDGET" 'BEGIN{printf "%.1f", 200*f/b}')"
+  if awk -v h="$haf" -v x="$f5" 'BEGIN{exit !(h>=90 || x>=90)}'; then
+    if [ "$FORCE" != "1" ]; then
+      err "budget: gate tripped (HAF=${haf}%, F5=${f5}%). Re-run with --force to override."
+      exit 3
+    fi
+    log "budget: gate tripped (HAF=${haf}%, F5=${f5}%) but --force set; proceeding"
+  else
+    log "budget: HAF=${haf}% F5=${f5}% (ok)"
+  fi
+}
+
+run_one() {
+  local task="$1" arm="$2"
+  local taskdir="$TASKS_DIR/$task"
+
+  if [ "$arm" = "mythos" ] && [ ! -f "$HEADLESS_FILE" ]; then
+    err "abort arm=mythos task=$task: missing $HEADLESS_FILE (needed for --append-system-prompt-file)"
+    return 0
+  fi
+
+  local wd; wd="$(mktemp -d)"
+  cp -R "$taskdir/repo/." "$wd/" 2>/dev/null
+
+  local run_id outdir prompt
+  run_id="$(date +%Y%m%d-%H%M%S)-${task}-${arm}"
+  outdir="$RUNS_DIR/$run_id"
+  mkdir -p "$outdir"
+  prompt="$(cat "$taskdir/prompt.txt")"
+
+  local -a args=(
+    -p "$prompt"
+    --model "$MODEL"
+    --permission-mode bypassPermissions
+    --output-format stream-json --verbose
+    --max-turns "$MAX_TURNS" --max-budget-usd "$MAX_BUDGET"
+  )
+  if [ "$arm" = "mythos" ]; then
+    args+=(--append-system-prompt-file "$HEADLESS_FILE")
+  fi
+
+  local start end elapsed rc
+  start="$(date +%s)"
+  ( cd "$wd" && MYTHOS_HOOKS=0 claude "${args[@]}" > "$outdir/run.jsonl" 2> "$outdir/run.err" )
+  rc=$?
+  end="$(date +%s)"
+  elapsed=$(( end - start ))
+
+  local metrics outcome verdict score
+  metrics="$(python3 "$METRICS" "$outdir/run.jsonl" 2>/dev/null)"
+  [ -z "$metrics" ] && metrics='{}'
+  outcome="$(bash "$taskdir/check.sh" "$wd" 2>/dev/null)"
+  verdict="$(printf '%s' "$outcome" | grep -oE 'PASS|FAIL' | head -1)"
+  [ -z "$verdict" ] && verdict="FAIL"
+  score="$(printf '%s' "$outcome" | sed -n 's/.*SCORE=\([^ ]*\).*/\1/p')"
+  [ -z "$score" ] && score="0/0"
+
+  mkdir -p "$outdir/workdir"
+  cp -R "$wd/." "$outdir/workdir/" 2>/dev/null || true
+  [ "$KEEP" = "1" ] || rm -rf "$wd"
+
+  local row_metrics
+  row_metrics="$(printf '%s' "$metrics" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    d = {}
+keys = ["turns", "tool_calls", "parallel_ratio", "verif_before_done",
+        "premature_qs", "subagents_with_model", "parallel_task_batches",
+        "in_tokens", "out_tokens", "cost_usd", "wall_s"]
+print("\t".join(str(d.get(k, 0)) for k in keys))
+')"
+  [ -z "$row_metrics" ] && row_metrics="0	0	0	0	0	0	0	0	0	0	0"
+
+  local sha date_s
+  sha="$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null)"
+  [ -z "$sha" ] && sha="nogit"
+  date_s="$(date +%Y-%m-%d)"
+
+  mkdir -p "$DATA_HOME"
+  if [ ! -f "$SCORES_TSV" ]; then
+    printf 'run_id\tdate\tarm\ttask\toutcome\tscore\tturns\ttool_calls\tparallel_ratio\tverif_before_done\tpremature_qs\tsubagents_with_model\tparallel_task_batches\tin_tokens\tout_tokens\tcost_usd\twall_s\tskill_sha\n' > "$SCORES_TSV"
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$run_id" "$date_s" "$arm" "$task" "$verdict" "$score" "$row_metrics" "$sha" >> "$SCORES_TSV"
+
+  log "  $task/$arm -> $outcome  (rc=$rc, ${elapsed}s, run_id=$run_id)"
+}
+
+cmd_run() {
+  local -a tasks=() arms=()
+  local name
+  while IFS= read -r name; do
+    task_matches "$name" "$TASK_FILTER" && tasks+=("$name")
+  done < <(discover_tasks)
+
+  local a
+  for a in bare mythos; do
+    arm_matches "$a" "$ARM_FILTER" && arms+=("$a")
+  done
+
+  if [ "${#tasks[@]}" -eq 0 ]; then
+    err "no matching tasks under $TASKS_DIR (filter='${TASK_FILTER:-*}')"
+    exit 2
+  fi
+  if [ "${#arms[@]}" -eq 0 ]; then
+    err "no matching arms (filter='${ARM_FILTER:-*}')"
+    exit 2
+  fi
+
+  budget_gate
+
+  log "plan: tasks=[${tasks[*]}] arms=[${arms[*]}] model=$MODEL"
+  log "caps: --max-turns $MAX_TURNS --max-budget-usd $MAX_BUDGET per run"
+  log "estimate: $ESTIMATE_NOTE ($(( ${#tasks[@]} * ${#arms[@]} )) runs)"
+  log "output: $RUNS_DIR  scores: $SCORES_TSV"
+
+  local t
+  for t in "${tasks[@]}"; do
+    for a in "${arms[@]}"; do
+      run_one "$t" "$a"
+    done
+  done
+
+  log "done. tally with: $0 report"
+}
+
+cmd_report() {
+  if [ ! -f "$SCORES_TSV" ]; then
+    log "no scores yet: $SCORES_TSV"
+    return 0
+  fi
+  python3 - "$SCORES_TSV" <<'PY'
+import csv, sys
+
+rows = list(csv.DictReader(open(sys.argv[1], newline=""), delimiter="\t"))
+latest = {}
+for r in rows:
+    latest[(r["task"], r["arm"])] = r
+
+tasks = sorted({r["task"] for r in rows})
+num = lambda v: float(v) if v not in (None, "", "0/0") else 0.0
+
+def g(task, arm, key):
+    r = latest.get((task, arm))
+    return r.get(key) if r else None
+
+for task in tasks:
+    print("== %s ==" % task)
+    b = latest.get((task, "bare"))
+    m = latest.get((task, "mythos"))
+    print("  %-8s %-6s %-8s %-6s %-6s %-8s %-8s" %
+          ("arm", "score", "outcome", "turns", "verif", "premQ", "cost_usd"))
+    for arm, r in (("bare", b), ("mythos", m)):
+        if not r:
+            print("  %-8s (no run)" % arm)
+            continue
+        print("  %-8s %-6s %-8s %-6s %-6s %-8s %-8s" %
+              (arm, r["score"], r["outcome"], r["turns"],
+               r["verif_before_done"], r["premature_qs"], r["cost_usd"]))
+    if b and m:
+        for key, label in (("turns", "turns"),
+                           ("verif_before_done", "verif_before_done"),
+                           ("premature_qs", "premature_qs"),
+                           ("cost_usd", "cost_usd")):
+            d = num(m[key]) - num(b[key])
+            print("  delta %-18s %+.2f (mythos - bare)" % (label, d))
+    print("")
+PY
+}
+
+cmd_estimate() {
+  log "estimate: $ESTIMATE_NOTE"
+  log "caps: --max-turns $MAX_TURNS --max-budget-usd $MAX_BUDGET per run"
+  log "override caps with MYTHOS_EVAL_MAX_TURNS / MYTHOS_EVAL_MAX_BUDGET"
+}
+
+usage() {
+  cat <<EOF
+usage: mythos-eval <command> [options]
+
+commands:
+  run [--task T1,T2] [--arm bare,mythos] [--keep] [--force] [--model <id>]
+  report
+  estimate
+
+defaults: all available tasks, both arms, model $DEFAULT_MODEL
+EOF
+}
+
+main() {
+  local cmd="${1:-}"
+  [ -n "$cmd" ] && shift || true
+  case "$cmd" in
+    run) : ;;
+    report) cmd_report; exit 0 ;;
+    estimate) cmd_estimate; exit 0 ;;
+    ""|-h|--help|help) usage; exit 0 ;;
+    *) err "unknown command: $cmd"; usage; exit 2 ;;
+  esac
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --task) TASK_FILTER="${2:-}"; shift 2 ;;
+      --arm) ARM_FILTER="${2:-}"; shift 2 ;;
+      --model) MODEL="${2:-}"; shift 2 ;;
+      --keep) KEEP=1; shift ;;
+      --force) FORCE=1; shift ;;
+      *) err "unknown option: $1"; usage; exit 2 ;;
+    esac
+  done
+
+  cmd_run
+}
+
+main "$@"

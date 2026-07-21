@@ -240,7 +240,7 @@ Sources scoring below 0.5 are flagged "low confidence" and noted explicitly when
 
 ## Knowledge Cutoff Discipline (Research-Specific)
 
-Cutoff: January 2026 (Opus 4.7).
+Cutoff: model-dependent; read it from the environment context at session start.
 
 For any source past the cutoff:
 - WebSearch verification is mandatory
@@ -255,7 +255,7 @@ Detail: [context-priming](../../core/context-priming.md) cutoff section.
 
 ## Context Budget (Retrieval Phase)
 
-Opus 4.7 has a 1M window. Retrieval allocation:
+Opus 4.8 has a 1M window. Retrieval allocation:
 
 | Slice | Target | If exceeded |
 |---|---|---|

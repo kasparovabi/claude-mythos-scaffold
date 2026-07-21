@@ -1,115 +1,158 @@
 ---
-description: Activate Mythos scaffold with skill set primed for a complex task.
+description: Activate Mythos scaffold with a persistent mission file for a complex task.
+argument-hint: <task> | resume | status | close
 ---
 
-# /mythos-mode  Activate Mythos Mode
+# /mythos-mode
 
-## Skill Set Path Resolution
-
-Before running the steps, resolve where the skill set lives:
-
-- Skills live in the global Claude Code skills directory. On Unix-like systems this is `~/.claude/skills/mythos-scaffold/core/`. On other platforms use the equivalent location.
-- Each skill file is named `<skill>.md` (fable-distilled, mode, context-priming, decomposition, tool-stack, agent-loop, verification, failure-recovery).
-
-In this document the notation `<MYTHOS>/<skill>.md` points at the resolved file inside that directory. `<MYTHOS>` always refers to `~/.claude/skills/mythos-scaffold/core`.
+Runs a task under the Mythos scaffold: kernel discipline, a persistent mission file, explicit
+sub-agent routing, verification before "done". Skill files live at
+`~/.claude/skills/mythos-scaffold/` (absolute paths below; on other platforms use the
+equivalent location).
 
 ## Input
+
 $ARGUMENTS
 
-- If an argument is given, run that task in Mythos mode.
-- If empty, ask "Mythos mode active. What is the task?" and start at step 1.
+- `<task>`: run this task in Mythos mode (step 0 onward).
+- `resume`: read the pointer `~/.cache/mythos/active` (if stale, glob
+  `~/.claude/mythos/missions/` for the newest `status: open` mission matching the cwd),
+  re-read the mission, continue from the first open PLAN item.
+- `status`: print the active mission's goal, open/done counts, last LOG line. No work.
+- `close`: set `status: done` in the active mission, append a final LOG line, remove the
+  pointer file. No work.
+- Empty: ask "Mythos mode active. What is the task?" and start at step 0 with the answer.
 
-## Philosophy
+## Model gating
 
-Mythos mode means seeing the capability ceiling and using a scaffold to close what can be closed.
-
-**Closable:** knowledge gap (RAG/web), action capacity (tool/MCP), persistence (loop), domain context (priming).
-**Not closable:** raw reasoning depth, novel pattern recognition, sample efficiency.
-
-Honest expectation: the scaffold transfers process discipline, not capability. It makes the executor a disciplined version of itself, not a Fable. Far less benefit on areas needing novel pattern discovery, like CVE hunting or exploit dev.
+If the session model is already Mythos-class (Fable 5 / Mythos 5), skip the scaffold: state
+goal and constraints, keep only the verify rule and the mission file if long-horizon, and let
+the model work. Over-scaffolding degrades Mythos-class output.
 
 ## Steps
 
-1. **Load distilled patterns and rules.**
-   Read `<MYTHOS>/fable-distilled.md` (Fable 5 working patterns, 2026-07-06), then `<MYTHOS>/mode.md`.
-   The seven behavior rules (persistence, verify, context budget, cutoff, plan-execute, parallel, destructive-stop) plus the distilled decomposition, verification, and next-action patterns are the law for this run.
+0. **Mission file.** Threshold first: one-line fix, factual question, five-minute job: skip
+   the mode entirely, do it directly, report. Otherwise create the mission:
+   - Slug: cwd basename, lowercased, non-alphanumerics to `-`. Path:
+     `~/.claude/mythos/missions/<slug>--$(date +%Y%m%d-%H%M).md`.
+   - Budget flag: read `~/.cache/wasteland/fable-share` (fields: EPOCH PCT FAB WEEK BUDGET).
+     BUDGET>0 and (100*WEEK/BUDGET >= 90 or 200*FAB/BUDGET >= 90): `red`; >= 70: `yellow`;
+     else `green`. File missing: `green`.
+   - Write the file from the template below, write its absolute path as the single line of
+     `~/.cache/mythos/active` (create the directory if needed).
+   - The mission file is executive memory, and hooks read it: keep the frontmatter keys and
+     checkbox markers exactly as in the template.
 
-2. **Threshold test.**
-   Does this task actually deserve Mythos mode?
-   - One-line fix, factual question, five-minute job: skip the mode, do it directly, report.
-   - Multi-step, multi-domain, real risk of getting stuck: continue.
+1. **Load the kernel.** Read `~/.claude/skills/mythos-scaffold/core/fable-distilled.md`.
+   Its directives plus this command are the law for the run. Open other core files only on
+   their kernel load-map triggers.
 
-3. **Priming.**
-   Follow `<MYTHOS>/context-priming.md`:
-   - Read the active `CLAUDE.md` (in cwd) and any related project notes.
-   - Scan a session history archive if one is maintained, and load relevant prior pages.
-   - If the topic is past your knowledge cutoff, use WebSearch and WebFetch.
-   - Context budget: stay under 15 percent of the 1M window.
+2. **Priming.** Only what the task needs: active `CLAUDE.md`, project notes, memory surface.
+   Post-cutoff topics get WebSearch/WebFetch. Cap priming at 10 to 15 percent of the window.
+   New domain: follow `core/context-priming.md`.
 
-4. **Decomposition.**
-   Follow `<MYTHOS>/decomposition.md`:
-   - Three-question decomposition test (single context, independence, verbosity).
-   - Write a plan into TodoWrite.
-   - Decide on sub-agents (Explore, Plan, Architect, Code-reviewer, Security, Build-error).
-   - Name the model on every sub-agent call: haiku for mechanical bulk, sonnet for light code, opus for heavy code and review.
-   - Independent parts go to parallel sub-agents.
+3. **Decomposition and workers.** Split by the kernel's rules; PLAN items go into the mission
+   file (TodoWrite optional mirror). For fan-out, use the named agents with the model stated
+   on every call, and follow the orchestration contract:
+   - `mythos-scout` (haiku): mechanical bulk: search, count, inventory, bulk read.
+   - `mythos-builder` (sonnet): scoped light implementation, single-area edits.
+   - `mythos-heavy` (opus): hard code, multi-file features, subtle debugging, architecture.
+   - `mythos-verifier` (sonnet): adversarial check of a claim or diff; it never edits.
+   - Spec template per worker: `T:<job> IN:<paths/refs> OUT:<schema, list caps> KISIT:<limits>`.
+     Full brief in the first message. Workers read files themselves; they return references
+     (`path:line`) and verdicts, never file bodies. Output over ~40 lines goes to a scratch
+     file; the return is the path plus a summary of at most 5 lines.
+   - Independent workers launch in ONE message. Continue your own track while they run; never
+     duplicate delegated work. Follow-ups to a live worker go via SendMessage, not a respawn.
+   - Do not delegate jobs under ~5K tokens of reading/writing; do them directly.
+   - Cheap-verify every worker verdict with one command before building on it.
+   - Budget flag `yellow`: prefer sonnet workers, avoid opus fan-out. `red`: no fan-out,
+     defer heavy work, tell the user.
+   - Record planned calls under `## WORKERS` in the mission.
 
-5. **Tool stack.**
-   Follow `<MYTHOS>/tool-stack.md`:
-   - Cascade: cheap and fast first.
-   - Independent searches go in one message as parallel tool calls.
-   - Decide if MCP is needed (chrome, playwright, firecrawl, computer-use, dedicated).
-   - No grep, find, or cat inside Bash. Use the dedicated tools.
+4. **Coding discipline.** If the task writes code: load the `guard-20` skill before the first
+   edit and apply it while writing. Mid-iteration verification is typecheck + tests + build +
+   smoke. `audit-20` runs only when the user declares the project final; never mid-loop.
 
-6. **Agent loop.**
-   Follow `<MYTHOS>/agent-loop.md`:
-   - Plan-and-Execute by default. ReAct only when the flow is genuinely uncertain.
-   - After each major step run Reflexion (four questions: what I did, what the goal was, the gap, next move).
-   - Critical output (code, plan, report) gets at least one Self-Refine pass (target quality 8/10).
-   - Stuck detection: three turns with no progress means change the pattern.
-   - Persistence ceiling: 10 turns, 30 minutes, or 200K tokens (20 percent of Opus 1M).
+5. **Agent loop.** Follow `core/agent-loop.md`: after each major step, one-line reflexion
+   against `DONE =`; critical output gets one self-refine pass. Stuck = three no-progress
+   turns: change the pattern (`core/failure-recovery.md`). Ceilings live in the mission
+   frontmatter (default 10 turns / 30 min / 200K tokens); at a ceiling, stop and report
+   honestly. Update `## PLAN` checkboxes with evidence and append one `## LOG` line at every
+   checkpoint; after any compaction, re-read the mission first.
 
-7. **Verification.**
-   Follow `<MYTHOS>/verification.md`:
-   - Definition of done: verify passed, output read, state consistent.
-   - Headless first (build, test, lint), visual after.
-   - Output reading discipline: exit code is not enough, read stderr and warnings.
-   - If the UI changed, run a Playwright or Chrome MCP smoke test.
+6. **Verification.** `core/verification.md`: headless checks before visual, output read fully,
+   evidence for every claim. UI changed: browser smoke test. Record results under `## VERIFY`.
 
-8. **Failure recovery (if needed).**
-   Follow `<MYTHOS>/failure-recovery.md`:
-   - Classify the failure: code, tool, logic, knowledge, env, stuck.
-   - Apply the class-specific strategy.
-   - Ralph Loop: verify, fail, feedback, iterate.
-   - Change the pattern instead of retrying the same path.
-   - Avoid destructive actions, ask the user.
-
-9. **Report.**
-   When the task is done, give a compact report:
+7. **Report and close.** Compact report in the user's language:
    ```
    Did: <one sentence>
-   Verify: <which checks passed>
-   Files: <changed or created files>
+   Verify: <which checks passed, with evidence>
+   Files: <changed or created>
    Next: <if any>
    ```
+   All PLAN items done: set `status: done`, final LOG line, remove
+   `~/.cache/mythos/active`. Genuinely blocked on the user: set `status: blocked`, ask the
+   one precise question. Failed at a ceiling: report approaches tried, current hypothesis,
+   options, and leave the mission open for `resume`.
 
-   If the task failed at the persistence ceiling, stop and report:
-   ```
-   Tried:
-   1. <approach A> -> <result and reason>
-   2. <approach B> -> <result and reason>
-   Current hypothesis: ...
-   Options: A. ... B. ...
-   Which should I try?
-   ```
+## Mission template
+
+```markdown
+---
+mythos_mission: v1
+id: <slug>--<yyyymmdd-hhmm>
+project: <slug>
+cwd: <absolute cwd>
+status: open
+model: <session model>
+created: <ISO timestamp>
+updated: <ISO timestamp>
+turn: 0
+ceil_turns: 10
+ceil_min: 30
+ceil_tok_k: 200
+budget_flag: <green|yellow|red>
+nudges: 0
+last_open: -1
+nudge_cap: 3
+---
+
+# G: <what the user holds at the end, one sentence>
+DONE = <testable done-condition>
+
+## INV
+- <constraint that must never be violated>
+
+## PLAN
+- [ ] T1 <first task>
+- [ ] T2 <second task>
+
+## VERIFY
+- method: <the check commands for this task>
+
+## WORKERS
+- <planned sub-agent calls, model explicit>
+
+## STOP
+- ask before: <destructive or scope-changing items>
+
+## LOG
+- [<hh:mm>] created
+```
+
+Markers: `[ ]` open, `[~]` in progress, `[x]` done with evidence on the same line, `[!]`
+stuck. Hooks count `[ ]`, `[~]`, `[!]` as open.
 
 ## Rules
 
-- **Model gating.** If the session model is already Mythos-class (Fable 5 / Mythos 5), skip steps 3 to 8: state the goal and constraints, keep only the verify rule, and let the model work. Over-scaffolding degrades Mythos-class output.
-- **Skip the mode when it is not warranted.** Mythos overhead on trivial work is pure loss.
-- **Stay faithful to the skill set.** Steps 3 to 8 are detailed in the linked files. Do not bypass them with "my own way."
-- **No completion without verify.** A TodoWrite item is not done until verify passes.
-- **When stuck, change the pattern.** Retrying the same path is not persistence, it is inertia.
-- **Never run destructive actions silently.** `rm -rf`, `git reset --hard`, force-push always need explicit user approval.
-- **Report in the user's language.** Direct, no AI slop, no filler.
-- **Be honest about the raw capability ceiling.** If the task needs reasoning depth the scaffold cannot reach, say "I can simulate it with the scaffold but it will not be enough."
+- **Stay faithful to the scaffold.** The kernel and the linked files are not decoration; do
+  not bypass them with "my own way".
+- **No completion without verify.** A PLAN item is not `[x]` until its evidence exists.
+- **When stuck, change the pattern.** Retrying the same path is not persistence, it is
+  inertia.
+- **Never run destructive actions silently.** `rm -rf`, `git reset --hard`, force push,
+  dependency removal: explicit user approval, every time.
+- **Report in the user's language.** Direct, no filler.
+- **Be honest about the ceiling.** If the task needs reasoning depth the scaffold cannot
+  reach, say which single question deserves a Fable/Mythos session and continue with the rest.

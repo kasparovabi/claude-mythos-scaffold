@@ -1,0 +1,47 @@
+# mythos active-task rule for the wasteland autoskill router (UserPromptSubmit).
+#
+# ANCHOR: ~/.config/wasteland/hooks/autoskill.py
+#   Insert the block below AFTER the existing `if hints:` block and IMMEDIATELY
+#   BEFORE the final `sys.exit(0)` line. It relies on symbols autoskill.py already
+#   defines: `p` (the lowercased prompt) and the top-level `import re`. It imports
+#   `os` and `tempfile` locally, so no other edit to autoskill.py is needed.
+#
+# BEHAVIOR:
+#   - Active mission (pointer exists): re-surface it every prompt; if the mission
+#     was parked `status: blocked`, the user is answering now, so flip it back to
+#     `status: open` (atomic) and the Stop hook resumes guarding.
+#   - No mission: if the prompt looks like real multi-step work, suggest /mythos-mode.
+#   - Fail-silent: any error is swallowed, the router keeps working.
+
+try:
+    import os
+    import tempfile
+    _ptr = os.environ.get("MYTHOS_PTR") or os.path.expanduser("~/.cache/mythos/active")
+    if os.path.exists(_ptr):
+        with open(_ptr, encoding="utf-8") as _f:
+            _mission = os.path.expanduser(_f.read().strip())
+        if _mission:
+            try:
+                with open(_mission, encoding="utf-8-sig") as _f:
+                    _text = _f.read()
+            except OSError:
+                _text = ""
+            if re.search(r"(?m)^status:[ \t]*blocked[ \t]*$", _text):
+                _fixed = re.sub(r"(?m)^status:[ \t]*blocked[ \t]*$", "status: open", _text, count=1)
+                _dir = os.path.dirname(_mission) or "."
+                _fd, _tmp = tempfile.mkstemp(dir=_dir, prefix=".mythos-", suffix=".tmp")
+                with os.fdopen(_fd, "w", encoding="utf-8") as _wf:
+                    _wf.write(_fixed)
+                os.replace(_tmp, _mission)
+            print("[mythos] aktif görev: %s — oku, kaldığın yerden devam et (bitmeden durma)." % _mission)
+    else:
+        _long = len(p) > 240
+        _segments = len(re.findall(r"[.;\n]|\bve\b|\bsonra\b|\bthen\b", p)) >= 3
+        _action = re.search(
+            r"implement|migrate|refactor|integrate|build|deploy|automate|"
+            r"araştır|kur|taşı|geçir|entegre|otomatik", p)
+        if _long or (_segments and _action):
+            print("[mythos] çok adımlı iş görünüyor. '/mythos-mode <görev>' kalıcı mission dosyası +")
+            print("         doğrulama disiplini ekler (biter bitmez durmaz, her maddeyi kanıtlar).")
+except Exception:
+    pass

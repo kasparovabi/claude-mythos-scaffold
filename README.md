@@ -3,83 +3,86 @@
 > Pattern-based scaffold for systematic AI agent work, with honest capability boundaries.
 > Inspired by observed Claude Mythos Preview behaviors (Anthropic, April 2026). Not affiliated with Anthropic.
 
-A Claude Code skill set that brings agentic discipline (Plan-and-Execute, Reflexion, Self-Refine, Ralph Loop) into structured, reusable protocols. Real-world tested in production sessions; capability limits documented honestly.
+A Claude Code skill set that brings agentic discipline (Plan-and-Execute, Reflexion, Self-Refine, Ralph Loop) into structured, reusable protocols. Since v0.3 the discipline is not only prose: a persistent mission file externalizes task state, Stop/SessionStart hooks enforce persistence at the harness level, named sub-agents carry explicit model routing, and a small eval harness measures the scaffold instead of trusting it.
 
 ## Why This Exists
 
-Claude Mythos Preview demonstrated agentic behaviors (problem persistence, multi-step iteration, verification-driven correction) that scaffold patterns can partially reproduce in Opus-class and smaller models (Opus 4.8, Sonnet 5, Haiku 4.5). This repo packages those patterns as opt-in skills. Since July 2026 the scaffold also carries `core/fable-distilled.md`: working patterns written by Claude Fable 5 (the GA'd Mythos-class model) about its own decomposition, verification, and next-action habits, captured during the 2-7 July free window.
+Claude Mythos Preview demonstrated agentic behaviors (problem persistence, multi-step iteration, verification-driven correction) that scaffold patterns can partially reproduce in Opus-class and smaller models (Opus 4.8, Sonnet 5, Haiku 4.5). This repo packages those patterns as opt-in skills. The kernel, `core/fable-distilled.md`, carries working patterns written by Claude Fable 5 (the GA'd Mythos-class model) about its own decomposition, verification, and next-action habits: first captured 2026-07-06, revised live by a Fable session 2026-07-21.
 
 **Honest expectation:** the scaffold transfers process discipline, not capability. It makes Opus 4.8 a disciplined Opus 4.8, not a Fable. Raw reasoning depth, novel pattern recognition, and sample efficiency cannot be patched in via prompts; those are weights. Do not fully load it on Fable 5 / Mythos 5: over-scaffolding degrades Mythos-class output.
 
-**What you get:** systematic protocols for tool selection, context priming, problem decomposition, verification loops, and failure recovery. Plus two domain modes: long-horizon research synthesis and codebase migration.
+**What you get:** a compact always-load kernel, demand-loaded protocols for tool selection, priming, decomposition, verification and failure recovery, a mission-file lifecycle with enforcement hooks, four worker agent definitions, a headless profile for unattended runs, an eval harness, and two domain modes (research synthesis, codebase migration).
 
 ## Repository Layout
 
 ```
 claude-mythos-scaffold/
-├── SKILL.md                       Skill entry: model gating + tiered activation
-├── core/                          Foundation skills (vault-agnostic)
-│   ├── fable-distilled.md         Fable 5 working patterns (read first)
-│   ├── mode.md                    Entry point, mode rules
+├── SKILL.md                       Skill entry: model gating + kernel activation
+├── INTEGRATION.md                 Route-don't-duplicate table (neighbor skills)
+├── core/
+│   ├── fable-distilled.md         The kernel: Fable 5 patterns + binding rules (read first)
+│   ├── mode.md                    Framing, honest ceiling, operating template
 │   ├── tool-stack.md              Cascade selection, parallel/sequential
 │   ├── context-priming.md         Adaptive RAG, source hierarchy
-│   ├── decomposition.md           Sub-agent delegation, hub-and-spoke
+│   ├── decomposition.md           Sub-agent delegation, model routing
 │   ├── agent-loop.md              Plan-Execute, Reflexion, Self-Refine
 │   ├── verification.md            Headless verify, output reading
 │   ├── failure-recovery.md        Ralph Loop, persistence threshold
-│   └── memory.md                  MemPalace integration, AAAK format
-├── domains/
-│   ├── research/                  Long-horizon multi-source synthesis
-│   │   ├── mode.md
-│   │   ├── retrieval.md           6-tier source hierarchy
-│   │   ├── synthesis.md           Claim graph, contradiction tree
-│   │   ├── cite-verify.md         Hallucination check, Feynman pattern
-│   │   └── output.md              Academic / blog / brief / slide / wiki
-│   └── migration/                 Codebase migration / framework upgrade
-│       ├── mode.md
-│       ├── audit.md               Footprint, breaking change matrix
-│       ├── plan.md                Phasing, calibrated time estimates
-│       ├── execute.md             Atomic commits, sub-agent parallel
-│       └── rollback.md            4 strategies, drill protocol
-├── commands/
-│   └── mythos-mode.md             /mythos-mode slash command
+│   ├── memory.md                  Cross-session memory integration
+│   └── headless.md                Preamble for unattended runs (cron, loops, eval)
+├── agents/                        Worker definitions (install into ~/.claude/agents/)
+│   ├── mythos-scout.md            haiku: mechanical bulk, references only
+│   ├── mythos-builder.md          sonnet: scoped light implementation
+│   ├── mythos-heavy.md            opus: hard multi-file work
+│   └── mythos-verifier.md         sonnet: adversarial verification, never edits
 ├── hooks/
-│   └── mythos-sync.py             PostToolUse hook, vault to global sync
-└── examples/
-    └── (real session walkthroughs, coming)
+│   ├── mythos-stop.py             Stop hook: blocks premature stops (bounded nudges)
+│   ├── mythos-session.py          SessionStart hook: mission survives compaction
+│   ├── autoskill-mythos-rule.snippet  Optional prompt-router rule (documented)
+│   ├── install.sh                 Copies hooks, prints settings JSON
+│   └── README.md                  Contract, registration, kill-switch
+├── eval/
+│   ├── mythos-eval                Runner: bare vs scaffold arms, headless
+│   ├── tools/metrics.py           Objective metrics from stream-json transcripts
+│   ├── tasks/T1-persistence/      Planted-obstacle fixture + check.sh
+│   ├── tasks/T2-verification/     Tempting-wrong-fix fixture + check.sh
+│   └── distill/CURATION.md        Distillation curation procedure (manual)
+├── domains/
+│   ├── research/                  mode, retrieval, synthesis, cite-verify, output
+│   └── migration/                 mode, audit, plan, execute, rollback
+└── commands/
+    └── mythos-mode.md             /mythos-mode: mission lifecycle + full pass
 ```
+
+Runtime state lives outside the repo: missions in `~/.claude/mythos/missions/`, the active-mission pointer in `~/.cache/mythos/active`, eval data in `~/.claude/mythos/eval-data/`.
 
 ## Quick Start
 
-### Option A: Drop into Claude Code
-
-Copy core skills to your global Claude Code skills directory.
+### Option A: Symlink into Claude Code (recommended)
 
 macOS or Linux:
 
 ```bash
-cp -R . ~/.claude/skills/mythos-scaffold
-cp commands/mythos-mode.md ~/.claude/commands/
+git clone https://github.com/kasparovabi/claude-mythos-scaffold ~/.claude/skills/mythos-scaffold
+cd ~/.claude/skills/mythos-scaffold
+ln -sf "$PWD/commands/mythos-mode.md" ~/.claude/commands/mythos-mode.md
+mkdir -p ~/.claude/agents
+for f in agents/mythos-*.md; do ln -sf "$PWD/$f" ~/.claude/agents/"$(basename "$f")"; done
+bash hooks/install.sh   # optional: enforcement hooks; prints the settings.json entries
 ```
 
-Copy the whole directory (not just `core/*`): `SKILL.md` resolves skills via relative `./core/` links and drives the tiered activation.
-
-Windows:
-
-```powershell
-Copy-Item -Recurse . $env:USERPROFILE\.claude\skills\mythos-scaffold
-Copy-Item commands\mythos-mode.md $env:USERPROFILE\.claude\commands\
-```
+Symlinks keep the installed command and agents in lockstep with the repo. If your platform lacks symlink support, `cp` works identically (the command uses absolute paths, no macro resolution).
 
 Then in any Claude Code session:
 
 ```
 /mythos-mode <your task>
+/mythos-mode resume | status | close
 ```
 
 ### Option B: Domain-only
 
-Just need research synthesis or codebase migration scaffold? Copy the relevant `domains/<name>/` directory plus `core/` (foundation skills are required).
+Just need research synthesis or codebase migration? Copy the relevant `domains/<name>/` directory plus `core/` (the kernel is required).
 
 ### Option C: Vault integration (Obsidian-style)
 
@@ -91,14 +94,10 @@ If you maintain a knowledge vault, the skills support `[[wikilink]]` cross-refer
 
 * `core/mode.md`, `tool-stack.md`, `context-priming.md`, `decomposition.md`, `agent-loop.md`, `verification.md`, `failure-recovery.md`
 
-**Newer (1 internal review pass):**
+**Newer (v0.3, self-tested + eval-smoked, real-world feedback expected):**
 
-* `core/fable-distilled.md` (distilled from Claude Fable 5 itself, 2026-07-06)
-* `core/memory.md` (MemPalace integration)
-* `domains/research/*` (5 skills)
-* `domains/migration/*` (5 skills)
-
-Real-world feedback expected; PRs welcome.
+* `core/fable-distilled.md` kernel revision, mission-file lifecycle, `hooks/*`, `agents/*`, `core/headless.md`, `eval/*`
+* `core/memory.md`, `domains/research/*`, `domains/migration/*`
 
 ## Acknowledgments
 
@@ -124,8 +123,8 @@ This repo is independent. **Not endorsed by Anthropic, MemPalace, or any cited p
 
 PRs welcome, see `CONTRIBUTING.md`. Particular areas of interest:
 
-* Cross-platform sync hook (currently Windows-tested, Unix variant needed)
-* Real-world session case studies (anonymized)
+* Real-world session case studies (anonymized) for an `examples/` directory
+* More eval tasks (decomposition, orchestration axes) and cross-model baselines
 * Generic versions of vault-specific references (some skills mention conventions like `(C)` prefix; these are opt-in)
 * Additional domain modes (data engineering, devops incident response, content writing)
 
@@ -137,6 +136,6 @@ MIT, see `LICENSE`.
 
 * "10x your AI agent" magic. Scaffolding helps consistency, not raw capability.
 * Drop-in replacement for engineering judgment. The scaffold structures decisions; humans still make them.
-* Production-stable v1.0. This is v0.1; patterns are sound, edge cases will surface.
+* Production-stable v1.0. This is v0.3; patterns are sound, edge cases will surface.
 
 If you're looking for those things, this repo will disappoint. If you're looking for systematic AI agent discipline with honest documentation, it's a starting point.

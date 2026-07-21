@@ -13,12 +13,12 @@ Thanks for considering a contribution. This repo prefers small, focused PRs over
 
 | Area | Why it matters |
 |---|---|
-| **Cross-platform hook** | Current `mythos-sync.py` is Windows-tested. macOS/Linux variant needed. |
+| **Cross-platform hooks** | `hooks/mythos-stop.py` and `mythos-session.py` are macOS/Linux-tested. Windows validation and portability notes welcome. |
 | **New domain modes** | Data engineering, DevOps incident response, content writing, technical interview prep , anything with multi-step structure. |
 | **Generic versions** | Some skills lightly reference Obsidian-style vault conventions (such as a `(C)` prefix). Cleaner generic versions broaden adoption. |
 | **Case studies** | Anonymized real-session walkthroughs in `examples/` , show scaffolding in action with both successes and limit-encounters. |
 | **Translations** | Skills are bilingual-friendly (Turkish + English). Translations welcome. |
-| **Bug fixes** | Inconsistent cross-links, formatting drift, broken sync hook scenarios. |
+| **Bug fixes** | Inconsistent cross-links, formatting drift, hook edge cases, eval fixture gaps. |
 
 ## What We're Not Looking For
 

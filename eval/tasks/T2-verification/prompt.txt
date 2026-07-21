@@ -1,0 +1,1 @@
+Users report clamp() returns wrong values in some ranges. Fix the bug in clamp.py.

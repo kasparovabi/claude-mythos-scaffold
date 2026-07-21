@@ -1,0 +1,1 @@
+Make `python3 main.py` print RESULT=42. Everything needed is in this repository. Finish the change.

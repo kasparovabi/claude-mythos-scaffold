@@ -1,0 +1,205 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import os
+import re
+import sys
+import time
+
+REDACTIONS = [
+    (re.compile(r"-----BEGIN[A-Z ]*PRIVATE KEY-----.*?-----END[A-Z ]*PRIVATE KEY-----", re.S), "[REDACTED-KEY]"),
+    (re.compile(r"sk-ant-[A-Za-z0-9_-]{12,}"), "sk-ant-[REDACTED]"),
+    (re.compile(r"sbp_[A-Za-z0-9]{16,}"), "sbp_[REDACTED]"),
+    (re.compile(r"AKIA[0-9A-Z]{16}"), "AKIA[REDACTED]"),
+    (re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"), "gh_[REDACTED]"),
+    (re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"), "xox-[REDACTED]"),
+    (re.compile(r"AIza[A-Za-z0-9_-]{30,}"), "AIza[REDACTED]"),
+    (re.compile(r"\bsk-[A-Za-z0-9]{32,}"), "sk-[REDACTED]"),
+    (re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), "[REDACTED-JWT]"),
+    (re.compile(r"\b([A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH)[A-Z0-9_]*)\s*[=:]\s*\S+"), r"\1=[REDACTED]"),
+    (re.compile(r"\b([a-z][a-z0-9+.-]*://[^:/\s@]+):([^@\s/]+)@"), r"\1:[REDACTED]@"),
+]
+ERROR_RX = re.compile(r"Traceback|\bError:|<tool_use_error>|\bFAIL(?:ED)?\b|exit code [1-9]|command not found|Exception", re.I)
+NOT_ERROR_RX = re.compile(r"updated successfully|created successfully|doesn't want to proceed|zoxide: detected")
+SUCCESS_RX = re.compile(r"\bPASS(?:ED)?\b|\bOK\b|exit 0|\bgreen\b|succeeded|✓", re.I)
+DECISION_RX = re.compile(r"\b(instead|because|root cause|the issue is|let me|rather than|so I(?:'ll| will)?|hypothesis)\b", re.I)
+VERIFY_RX = re.compile(r"pytest|unittest|npm (run )?(test|build)|tsc\b|cargo (test|build|check)|go (test|build)|\bmake\b|build\b.*exit|smoke")
+DONE_RX = re.compile(r"\b(done|complete[d]?|finished|verified|works|passing|deployed)\b", re.I)
+WEIGHTS = {"error-recovery": 5, "parallel-fanout": 4, "decision-point": 3, "verify-before-claim": 3, "stop-ask": 1}
+
+
+def redact(text, anon):
+    for rx, repl in REDACTIONS:
+        text = rx.sub(repl, text)
+    if anon:
+        text = re.sub(r"/Users/[^/\s]+", "~", text)
+    return text
+
+
+def excerpt(text, n=240):
+    text = re.sub(r"\s+", " ", text or "").strip()
+    return text[:n]
+
+
+def parse_session(path, max_bytes=200_000):
+    events = []
+    is_fable = False
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if len(line) > max_bytes:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except ValueError:
+                    continue
+                typ = obj.get("type")
+                msg = obj.get("message") or {}
+                if typ == "assistant":
+                    model = msg.get("model") or ""
+                    if model.startswith("claude-fable-5"):
+                        is_fable = True
+                    texts, tools = [], []
+                    for blk in msg.get("content") or []:
+                        if not isinstance(blk, dict):
+                            continue
+                        if blk.get("type") == "text":
+                            texts.append(blk.get("text") or "")
+                        elif blk.get("type") == "tool_use":
+                            inp = blk.get("input") or {}
+                            tools.append({
+                                "name": blk.get("name") or "",
+                                "model": inp.get("model") or "",
+                                "cmd": excerpt(str(inp.get("command") or ""), 160),
+                            })
+                    events.append({"kind": "a", "model": model, "text": "\n".join(texts), "tools": tools})
+                elif typ == "user":
+                    err = False
+                    body = []
+                    for blk in (msg.get("content") or []) if isinstance(msg.get("content"), list) else []:
+                        if isinstance(blk, dict) and blk.get("type") == "tool_result":
+                            if blk.get("is_error"):
+                                err = True
+                            body.append(excerpt(str(blk.get("content") or ""), 400))
+                    joined = " ".join(body)
+                    if joined and ERROR_RX.search(joined) and not NOT_ERROR_RX.search(joined):
+                        err = True
+                    elif NOT_ERROR_RX.search(joined):
+                        err = False
+                    events.append({"kind": "r", "error": err, "text": joined})
+    except OSError:
+        return [], False
+    return events, is_fable
+
+
+def mine(events, src):
+    out = []
+    a_idx = [i for i, e in enumerate(events) if e["kind"] == "a"]
+    for i, e in enumerate(events):
+        if e["kind"] == "r" and e["error"]:
+            later_a = [j for j in a_idx if j > i][:4]
+            for j in later_a:
+                nxt = events[j]
+                if nxt["tools"] and SUCCESS_RX.search(" ".join(ev["text"] for ev in events[j:j + 3] if ev["kind"] == "r")):
+                    pivot = excerpt(nxt["text"], 200)
+                    if not pivot:
+                        pivot = "-> " + "; ".join(
+                            (t["name"] + (": " + t["cmd"] if t["cmd"] else "")) for t in nxt["tools"][:3])
+                    out.append(("error-recovery", src, "err: %s || pivot: %s" % (excerpt(e["text"], 160), excerpt(pivot, 200))))
+                    break
+        if e["kind"] != "a":
+            continue
+        if len(e["tools"]) >= 2:
+            shape = ", ".join(t["name"] + ("(%s)" % t["model"] if t["model"] else "") for t in e["tools"][:6])
+            out.append(("parallel-fanout", src, "batch[%d]: %s" % (len(e["tools"]), shape)))
+        if e["text"] and DECISION_RX.search(e["text"]) and not e["tools"]:
+            out.append(("decision-point", src, excerpt(e["text"], 240)))
+        for t in e["tools"]:
+            if t["name"] == "Bash" and VERIFY_RX.search(t["cmd"]):
+                rest = " ".join(ev["text"] for ev in events[i:] if ev["kind"] == "a")
+                if DONE_RX.search(rest):
+                    out.append(("verify-before-claim", src, "cmd: %s" % t["cmd"]))
+                break
+    if a_idx:
+        last = events[a_idx[-1]]
+        if last["text"].strip().endswith("?"):
+            out.append(("stop-ask", src, excerpt(last["text"][-300:], 200)))
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="mythos-distill")
+    ap.add_argument("cmd", choices=["extract"])
+    ap.add_argument("--days", type=int, default=30)
+    ap.add_argument("--max-sessions", type=int, default=40)
+    ap.add_argument("--cap", type=int, default=30)
+    ap.add_argument("--anon", action="store_true")
+    ap.add_argument("--out", default=os.path.expanduser("~/.claude/mythos/distill/candidates.md"))
+    args = ap.parse_args()
+
+    root = os.path.expanduser("~/.claude/projects")
+    cutoff = time.time() - args.days * 86400
+    files = []
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for fn in filenames:
+            if fn.endswith(".jsonl"):
+                p = os.path.join(dirpath, fn)
+                try:
+                    mt = os.path.getmtime(p)
+                except OSError:
+                    continue
+                if mt >= cutoff:
+                    files.append((mt, p))
+    files.sort(reverse=True)
+
+    candidates, scanned = [], 0
+    for _mt, p in files:
+        if scanned >= args.max_sessions:
+            break
+        events, is_fable = parse_session(p)
+        if not is_fable:
+            continue
+        scanned += 1
+        src = os.path.basename(p)
+        candidates.extend(mine(events, src))
+
+    seen, uniq = set(), []
+    for typ, src, ev in candidates:
+        key = (typ, ev[:80])
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append((typ, src, ev))
+    uniq.sort(key=lambda c: -WEIGHTS.get(c[0], 0))
+    per_type_cap = max(6, args.cap // 3)
+    counts, capped = {}, []
+    for c in uniq:
+        if counts.get(c[0], 0) >= per_type_cap:
+            continue
+        counts[c[0]] = counts.get(c[0], 0) + 1
+        capped.append(c)
+    uniq = capped[:args.cap]
+
+    os.makedirs(os.path.dirname(args.out), exist_ok=True)
+    lines = ["# mythos-distill candidates", "",
+             "Mined from %d Fable session(s), last %d days. PRIVATE: never commit." % (scanned, args.days),
+             "Curation procedure: eval/distill/CURATION.md in the scaffold repo.", ""]
+    for typ in WEIGHTS:
+        group = [c for c in uniq if c[0] == typ]
+        if not group:
+            continue
+        lines.append("## %s (%d)" % (typ, len(group)))
+        for _typ, src, ev in group:
+            lines.append("- [%s] %s" % (src, redact(ev, args.anon)))
+        lines.append("")
+    tmp = args.out + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    os.replace(tmp, args.out)
+    print("wrote %s (%d candidates, %d sessions)" % (args.out, len(uniq), scanned))
+
+
+try:
+    main()
+except BrokenPipeError:
+    sys.exit(0)
