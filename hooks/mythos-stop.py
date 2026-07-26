@@ -139,7 +139,9 @@ def main():
     if give_up:
         items = "; ".join(strip_box(x) for x in open_items[:5])
         new_text = new_text.rstrip("\n") + "\n> left open (nudge cap %d): %s\n" % (cap, items)
+        new_text = set_field(new_text, "status", "abandoned")
         atomic_write(mission_path, new_text)
+        unlink_quiet(ptr)
         print(json.dumps(
             {"systemMessage": "mythos: %d madde açık, nudge tavanı (%d) doldu, bırakıldı." % (cur, cap)},
             ensure_ascii=False))

@@ -1,6 +1,6 @@
 ---
 name: mythos-scaffold
-description: Push Opus-class and smaller models toward Mythos/Fable-grade agentic behavior. Kernel of Fable-distilled patterns (decomposition, verification, next-action, context economy) plus demand-loaded skills, persistent mission files, named sub-agents, enforcement hooks, and domain modes (research, migration). Use when starting complex multi-step work, long-horizon tasks, or anything needing systematic persistence and verification. Do NOT fully load on Fable 5 / Mythos 5; over-scaffolding degrades Mythos-class models.
+description: Push Opus 4.x-class and smaller models toward Mythos/Fable-grade agentic behavior. Kernel of Fable-distilled patterns (decomposition, verification, next-action, context economy) plus demand-loaded skills, persistent mission files, named sub-agents, enforcement hooks, and domain modes (research, migration). Use when starting complex multi-step work, long-horizon tasks, or anything needing systematic persistence and verification. Do NOT fully load on Claude 5 models (Fable 5 / Mythos 5 / Opus 5 and later); over-scaffolding degrades them.
 ---
 
 # Mythos scaffold
@@ -17,8 +17,10 @@ Opus 4.8 a disciplined Opus 4.8. See `eval/` for measured deltas.
 
 | Session model | What to load |
 |---|---|
-| Opus 4.8 / Opus 4.x / Sonnet / Haiku | Kernel, then tiered (below) |
-| Fable 5 / Mythos 5 | Nothing, or at most the kernel's verification section. State goal and constraints; do not enumerate steps. |
+| Opus 4.8 / Opus 4.x / Sonnet 4.x / Haiku | Kernel, then tiered (below) |
+| Claude 5 family (Fable 5 / Mythos 5 / Opus 5 / Sonnet 5) and later | Nothing, or at most the kernel's verification section. State goal and constraints; do not enumerate steps. |
+
+When in doubt (a model newer than this table): treat it as Claude 5 family — under-scaffolding costs less than over-scaffolding on capable models.
 
 ## Activation
 
@@ -64,7 +66,7 @@ The scaffold routes to neighbors instead of duplicating them: see
 
 - Single tool call, single answer questions: overhead not worth it
 - Tasks already covered by a more specific skill
-- Sessions running on Fable 5 / Mythos 5 (model gating above)
+- Sessions running on Claude 5 family models — Fable 5 / Mythos 5 / Opus 5 / Sonnet 5 (model gating above)
 
 ## Changelog
 

@@ -25,9 +25,9 @@ $ARGUMENTS
 
 ## Model gating
 
-If the session model is already Mythos-class (Fable 5 / Mythos 5), skip the scaffold: state
-goal and constraints, keep only the verify rule and the mission file if long-horizon, and let
-the model work. Over-scaffolding degrades Mythos-class output.
+If the session model is Claude 5 family (Fable 5 / Mythos 5 / Opus 5 / Sonnet 5) or newer,
+skip the scaffold: state goal and constraints, keep only the verify rule and the mission file
+if long-horizon, and let the model work. Over-scaffolding degrades these models' output.
 
 ## Steps
 
@@ -146,8 +146,9 @@ stuck. Hooks count `[ ]`, `[~]`, `[!]` as open.
 
 ## Rules
 
-- **Stay faithful to the scaffold.** The kernel and the linked files are not decoration; do
-  not bypass them with "my own way".
+- **The scaffold is the default path, not a cage.** Follow the kernel and linked files
+  unless you can name a concrete reason a step hurts this task; when you deviate, log the
+  reason in the mission LOG line.
 - **No completion without verify.** A PLAN item is not `[x]` until its evidence exists.
 - **When stuck, change the pattern.** Retrying the same path is not persistence, it is
   inertia.

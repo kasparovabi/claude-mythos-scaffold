@@ -28,8 +28,9 @@ codename **Capybara**, distributed under Project Glasswing to critical partner o
 (`claude-fable-5`, priced well above Opus 4.8), with `claude-mythos-5` continuing under
 Project Glasswing. Fable's own working patterns were distilled into the kernel
 ([fable-distilled](./fable-distilled.md)), first on 2026-07-06, revised 2026-07-21. The daily
-executor this scaffold targets is **Opus 4.8**. If the session model is already Fable/Mythos
-class, do not load the scaffold (see SKILL.md model gating).
+executor this scaffold targets is **Opus 4.8**. If the session model is Claude 5 family
+(Fable 5 / Mythos 5 / Opus 5 / Sonnet 5) or newer, do not load the scaffold (see SKILL.md
+model gating).
 
 Characteristics: strong autonomous reasoning over long horizons, subtle-failure detection,
 multi-stage execution without losing focus. The most distinctive trait: iterating on a

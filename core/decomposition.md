@@ -87,11 +87,7 @@ Available agent types (global agents directory plus harness built ins):
 | **general-purpose** | Multi step work of unclear type | Hybrid research plus build |
 | **code-reviewer** | Review of code just written | After every code edit |
 | **build-error-resolver** | Build/test failures | Compile or lint breakage |
-| **go-build-resolver** | Go build/vet/lint | Build error in a Go project |
-| **go-reviewer** | Go idiomatic and concurrency review | Go code review |
 | **python-reviewer** | PEP 8, type hints, idioms | Python code review |
-| **database-reviewer** | SQL/Postgres, migrations | DB changes |
-| **e2e-runner** | Playwright E2E | Critical user flow |
 | **refactor-cleaner** | Dead code, duplicates | Cleanup pass |
 | **doc-updater** | Codemap, docs refresh | After a new feature |
 | **tdd-guide** | Test first methodology | New feature, bug fix |

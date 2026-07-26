@@ -124,8 +124,10 @@ related:
 - **Memory:** before any multi-turn task, check the memory surface; write durable learnings
   back as you go. One lesson per entry, update instead of duplicating, delete what proves
   wrong.
-- **Effort:** default `high`; `xhigh` for genuinely hard coding or agentic runs; `medium` for
-  routine sweeps. Higher effort up front often lowers total cost by cutting turn count.
+- **Effort (Opus 4.x):** default `high`; `xhigh` for genuinely hard coding or agentic runs;
+  `medium` for routine sweeps. Higher effort up front often lowers total cost by cutting turn
+  count. Claude 5 models calibrate differently — Opus 5 measurably peaks at `medium` and
+  degrades above it; do not export this recipe to them.
 - **Code review:** report every finding with confidence and severity, filter downstream.
   "Only report high-severity" instructions make 4.8 silently drop real bugs.
 
@@ -149,8 +151,9 @@ with everything below that bar yourself.
 
 ## Model gating
 
-- **Opus 4.8 / Opus 4.x / Sonnet / Haiku:** load this kernel; open other files on trigger.
-- **Fable 5 / Mythos 5:** skip the scaffold, or load at most section 2 of this file.
-  Anthropic's migration guide is explicit: "prompts and skills written for prior models are
-  often too prescriptive and reduce output quality." State the goal and constraints; do not
-  enumerate steps.
+- **Opus 4.8 / Opus 4.x / Sonnet 4.x / Haiku:** load this kernel; open other files on trigger.
+- **Claude 5 family (Fable 5 / Mythos 5 / Opus 5 / Sonnet 5) and later:** skip the scaffold,
+  or load at most section 2 of this file. Anthropic's migration guide is explicit: "prompts
+  and skills written for prior models are often too prescriptive and reduce output quality."
+  State the goal and constraints; do not enumerate steps. Unknown newer model: same rule —
+  under-scaffolding is the cheaper mistake.
