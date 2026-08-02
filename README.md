@@ -1,5 +1,38 @@
 # Claude Mythos Scaffold
 
+## Retired, August 2026
+
+This repository is archived and no longer maintained. The reason is the one the
+scaffold itself warned about.
+
+The README below already said it: "Do not fully load it on Fable 5 / Mythos 5:
+over-scaffolding degrades Mythos-class output." That caveat now covers the models
+most people run. Opus 5, Sonnet 5 and Fable 5 carry the decomposition, verification
+and persistence habits this scaffold was written to install, so loading it costs
+context and gives back little.
+
+Anthropic's own guidance points the same way. Boris Cherny, who created Claude Code,
+told developers at Y Combinator Startup School in 2026 to delete their CLAUDE.md
+files, skills and hooks every six months, and to try deleting all of them for Opus 5
+because the model may no longer need instructions that earlier models did. Anthropic
+removed roughly 80 percent of Claude Code's own system prompt for the Claude 5
+generation.
+
+I ran that experiment on my own setup on 1 August 2026: 41 global skills, four hook
+registrations and most of a CLAUDE.md went into an archive folder. The result was
+better, not worse. Keeping this repository presented as live guidance would work
+against the people who find it.
+
+**If you are on Opus 4.x or smaller and the patterns still help you, the code is
+here and still works.** Fork it. Nothing was deleted.
+
+**What holds up regardless of model:** externalizing task state to a file so it
+survives compaction, verifying a claim before reporting it done, and measuring a
+scaffold instead of trusting it. Those three ideas are in `core/fable-distilled.md`
+and `eval/`, and they age better than the prose around them.
+
+---
+
 > Pattern-based scaffold for systematic AI agent work, with honest capability boundaries.
 > Inspired by observed Claude Mythos Preview behaviors (Anthropic, April 2026). Not affiliated with Anthropic.
 
